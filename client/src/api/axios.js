@@ -4,7 +4,7 @@ export const STORAGE_KEY = 'devsync_token';
 
 /** @type {import('axios').AxiosInstance} */
 export const api = axios.create({
-  baseURL: 'https://devsync-production-998b.up.railway.app/api',
+  baseURL: 'https://devsync-production-7db6.up.railway.app/api',
   headers: {
     'Content-Type': 'application/json',
   },
