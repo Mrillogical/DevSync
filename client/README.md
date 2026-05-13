@@ -91,11 +91,3 @@ Each project has two roles — **admin** and **member**.
 - **Member** — can view assigned tasks and update their status
 
 The user who creates a project is automatically the admin.
-
-## Deployment
-
-- **Backend** → [Railway](https://railway.app)
-- **Frontend** → [Vercel](https://vercel.com) or [Netlify](https://netlify.com)
-- **Database** → Railway PostgreSQL or [Neon](https://neon.tech)
-
-Before deploying the frontend, update `baseURL` in `client/src/api/axios.js` to point to your live backend URL.
