@@ -1,10 +1,12 @@
-const path = require('path');
 const http = require('http');
 
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 
 const express = require('express');
 const cors = require('cors');
+
 const { ping, closePool } = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const projectRoutes = require('./routes/projectRoutes');
@@ -12,12 +14,14 @@ const taskRoutes = require('./routes/taskRoutes');
 const memberRoutes = require('./routes/memberRoutes');
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+
+const PORT = process.env.PORT || 8080;
 const isProd = process.env.NODE_ENV === 'production';
 
 app.disable('x-powered-by');
 
 const corsOrigin = process.env.CORS_ORIGIN;
+
 app.use(
   cors({
     origin:
@@ -32,19 +36,24 @@ app.use(
 
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
 
+app.get('/', (req, res) => {
+  res.send('DevSync API Running');
+});
 
 app.get('/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     status: 'ok',
     uptime: process.uptime(),
   });
 });
 
-
 app.get('/health/ready', async (req, res, next) => {
   try {
     await ping();
-    res.json({ status: 'ok', database: 'connected' });
+    res.json({
+      status: 'ok',
+      database: 'connected',
+    });
   } catch (err) {
     next(err);
   }
@@ -78,12 +87,16 @@ async function startServer() {
     const onListenError = (listenErr) => {
       reject(listenErr);
     };
+
     server.once('error', onListenError);
+
     server.listen(PORT, () => {
       server.removeListener('error', onListenError);
+
       console.log(
         `HTTP server listening on port ${PORT} (${isProd ? 'production' : 'development'})`
       );
+
       resolve();
     });
   });
@@ -92,9 +105,11 @@ async function startServer() {
 async function verifyPostgresAtStartup() {
   try {
     await ping();
+
     console.log('[db] PostgreSQL connection successful (pool verified)');
   } catch (err) {
     const root = err.cause ?? err;
+
     console.error('[db] PostgreSQL connection failed at startup', {
       message: err.message,
       ...(root !== err && { causeMessage: root.message }),
@@ -113,15 +128,20 @@ function errorHandler(err, req, res, next) {
     err.type === 'entity.parse.failed' ||
     (err instanceof SyntaxError && 'body' in err)
   ) {
-    res.status(400).json({ error: 'Invalid JSON body' });
+    res.status(400).json({
+      error: 'Invalid JSON body',
+    });
+
     return;
   }
 
   const status = resolveHttpStatus(err);
-  const exposeMessage = !isProd || status < 500;
 
   const payload = {
-    error: exposeMessage ? err.message : http.STATUS_CODES[status] || 'Error',
+    error:
+      !isProd || status < 500
+        ? err.message
+        : http.STATUS_CODES[status] || 'Error',
   };
 
   if (err.details !== undefined && err.details !== null) {
@@ -147,21 +167,33 @@ function errorHandler(err, req, res, next) {
 
 function resolveHttpStatus(err) {
   const n = Number(err.status ?? err.statusCode);
+
   if (Number.isFinite(n) && n >= 400 && n < 600) {
     return n;
   }
+
   if (err.name === 'DatabaseError') {
     return err.isConnectionFailure ? 503 : 500;
   }
+
   return 500;
 }
 
 async function shutdown(signal) {
   console.log(`${signal}: shutting down gracefully`);
+
   await new Promise((resolve, reject) => {
-    server.close((closeErr) => (closeErr ? reject(closeErr) : resolve()));
+    server.close((closeErr) => {
+      if (closeErr) {
+        reject(closeErr);
+      } else {
+        resolve();
+      }
+    });
   });
+
   await closePool();
+
   process.exit(0);
 }
 
